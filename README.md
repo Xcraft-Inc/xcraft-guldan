@@ -10,4 +10,4 @@
 ## What ?
 
 Use Gul'dan in order to extract the list of all (or mostly) dependencies
-of a msbuild projects (and in some cases solutions).
+of MSBuild projects (and in some cases solutions).
