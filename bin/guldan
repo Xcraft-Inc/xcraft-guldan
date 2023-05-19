@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const cheerio = require('cheerio');
+const parser = require('vs-parse');
+const path = require('path');
+const yargs = require('yargs/yargs');
+const {hideBin} = require('yargs/helpers');
+
+const missing = {};
+let dependencies = {};
+let properties = {};
+let argv;
+
+function resolveImported(importedFile, projectFile) {
+  const importedFilePath = resolveImportedFilePath(importedFile, projectFile);
+  const importedDependencies = resolveDependencies(importedFilePath);
+  return {...dependencies, ...importedDependencies};
+}
+
+function resolveDependencies(projectFile) {
+  if (dependencies[projectFile]) {
+    return;
+  }
+
+  if (!fs.existsSync(projectFile) || fs.statSync(projectFile).isDirectory()) {
+    if (argv.showMissing) {
+      missing[projectFile] = true;
+    }
+    return;
+  }
+
+  dependencies[projectFile] = true;
+
+  if (projectFile.endsWith('.sln')) {
+    const solutionData = parser.parseSolutionSync(projectFile, {
+      deepParse: true,
+    });
+    solutionData.projects.forEach(({relativePath}) => {
+      resolveImported(relativePath, projectFile);
+    });
+  }
+
+  const projContent = fs.readFileSync(projectFile, 'utf8');
+  const $ = cheerio.load(projContent, {xmlMode: true});
+
+  /* Extract properties, it can be useful in case of locations with variables */
+  const propertyGroup = $('PropertyGroup');
+  propertyGroup.children().each((_, element) => {
+    const tagName = $(element).prop('tagName');
+    const value = $(element).text();
+    properties[tagName] = value;
+  });
+
+  /* FIXME: broken in case of concat like SOMETHING=$(SOMETHING)$(V)
+  const _properties = {};
+  Object.keys(properties).forEach((key) => {
+    _properties[key] = properties[key].replace(
+      /\$\(([^)]+)\)/g,
+      (pattern, value) => {
+        const valueUp = value.toUpperCase();
+        if (properties[valueUp]) {
+          return properties[valueUp];
+        }
+        return pattern;
+      }
+    );
+  });
+  properties = _properties;
+*/
+
+  /* vcxproj, ... */
+  $('Project > ItemGroup > ProjectReference').each((_, projectRef) => {
+    const importedFile = $(projectRef).attr('Include');
+    if (importedFile) {
+      resolveImported(importedFile, projectFile);
+    }
+  });
+
+  /* props, targets, ... */
+  $('Project > ImportGroup > Import').each((_, importElement) => {
+    const importedFile = $(importElement).attr('Project');
+    if (importedFile) {
+      resolveImported(importedFile, projectFile);
+    }
+  });
+
+  /* props, targets, ... */
+  $('Project > Import').each((_, importElement) => {
+    const importedFile = $(importElement).attr('Project');
+    if (importedFile) {
+      resolveImported(importedFile, projectFile);
+    }
+  });
+
+  /* msbuildproj, sln, ... */
+  $('Project > ItemGroup > ImportProject').each((_, ImportProjectElement) => {
+    const importedFile = $(ImportProjectElement).attr('Include');
+    if (importedFile) {
+      resolveImported(importedFile, projectFile);
+    }
+  });
+}
+
+function normalizePath(filePath, currentFile) {
+  return filePath
+    .replace(/\$\(([^)]+)\)/g, (pattern, value) => {
+      const valueUp = value.toUpperCase();
+      if (properties[valueUp]) {
+        if (properties[valueUp].toUpperCase().indexOf(valueUp) >= 0) {
+          // BUNDLEDIR: $(BundleDir)$(V)
+          return pattern;
+        }
+        return properties[valueUp];
+      }
+      return pattern;
+    })
+    .replace(/\\/g, '/')
+    .replace('$(V)', '/')
+    .replace('$(BundleDir)', bundleDir)
+    .replace('$(ZouDir)', path.join(bundleDir, 'zou') + '/');
+}
+
+function resolveImportedFilePath(importedFile, currentFile) {
+  const currentDirectory = path.dirname(currentFile);
+  const normalizedImportedFile = normalizePath(importedFile, currentFile);
+  const importedFilePath = path.resolve(
+    currentDirectory,
+    normalizedImportedFile
+  );
+  return importedFilePath;
+}
+
+argv = yargs(hideBin(process.argv))
+  .usage('Usage: $0 [options] <myProject.vcxproj>')
+  .demandCommand(1)
+  .boolean('m')
+  .alias('m', 'show-missing')
+  .describe('m', 'Show missing projects')
+  .boolean('p')
+  .alias('p', 'show-full')
+  .describe('p', 'Show full project paths')
+  .help('h')
+  .alias('h', 'help').argv;
+
+const projectPath = argv._[0];
+
+let bundleDir;
+if (fs.existsSync(path.join(projectPath, '../../zou'))) {
+  bundleDir = path.resolve(projectPath, '../..') + '/';
+} else if (fs.existsSync(path.join(projectPath, '../../../zou'))) {
+  bundleDir = path.resolve(projectPath, '../../..') + '/';
+} else {
+  console.error(`The bundle directory cannot be found`);
+}
+
+resolveDependencies(projectPath);
+const folders = bundleDir.split(path.sep);
+
+let projects = {};
+if (argv.showFull) {
+  projects = dependencies;
+} else {
+  for (let dep of Object.keys(dependencies)) {
+    dep = dep.split(path.sep).slice(folders.length - 1);
+    projects[dep[0]] = true;
+  }
+}
+
+Object.keys(missing)
+  .sort()
+  .forEach((project) => console.error(`MISSING: ${project}`));
+
+Object.keys(projects)
+  .sort()
+  .forEach((project) => console.log(project));
