@@ -10,6 +10,7 @@ const {hideBin} = require('yargs/helpers');
 const missing = {};
 let dependencies = {};
 let properties = {};
+let bundleDir;
 let argv;
 
 function resolveImported(importedFile, projectFile) {
@@ -145,13 +146,12 @@ argv = yargs(hideBin(process.argv))
 
 const projectPath = argv._[0];
 
-let bundleDir;
 if (fs.existsSync(path.join(projectPath, '../../zou'))) {
   bundleDir = path.resolve(projectPath, '../..') + '/';
 } else if (fs.existsSync(path.join(projectPath, '../../../zou'))) {
   bundleDir = path.resolve(projectPath, '../../..') + '/';
 } else {
-  console.error(`The bundle directory cannot be found`);
+  bundleDir = path.dirname(projectPath);
 }
 
 resolveDependencies(projectPath);
