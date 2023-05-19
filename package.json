@@ -12,5 +12,11 @@
     "cheerio": "^1.0.0-rc.12",
     "vs-parse": "^3.1.2",
     "yargs": "^17.7.2"
-  }
+  },
+  "devDependencies": {
+    "xcraft-dev-rules": "^4.2.5",
+    "prettier": "2.0.4",
+    "xcraft-dev-prettier": "^2.0.0"
+  },
+  "prettier": "xcraft-dev-prettier"
 }
