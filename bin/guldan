@@ -141,6 +141,9 @@ argv = yargs(hideBin(process.argv))
   .boolean('p')
   .alias('p', 'show-full')
   .describe('p', 'Show full project paths')
+  .boolean('d')
+  .alias('d', 'dirname-only')
+  .describe('d', "Show only the directory's name")
   .help('h')
   .alias('h', 'help').argv;
 
@@ -163,7 +166,7 @@ if (argv.showFull) {
 } else {
   for (let dep of Object.keys(dependencies)) {
     dep = dep.split(path.sep).slice(folders.length - 1);
-    projects[dep[0]] = true;
+    projects[argv.dirnameOnly ? dep[0] : path.join(bundleDir, dep[0])] = true;
   }
 }
 
