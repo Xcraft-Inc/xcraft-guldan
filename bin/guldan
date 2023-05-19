@@ -116,10 +116,10 @@ function normalizePath(filePath, currentFile) {
       }
       return pattern;
     })
-    .replace(/\\/g, '/')
-    .replace('$(V)', '/')
+    .replace(/\\/g, path.sep)
+    .replace('$(V)', path.sep)
     .replace('$(BundleDir)', bundleDir)
-    .replace('$(ZouDir)', path.join(bundleDir, 'zou') + '/');
+    .replace('$(ZouDir)', path.join(bundleDir, 'zou') + path.sep);
 }
 
 function resolveImportedFilePath(importedFile, currentFile) {
@@ -150,9 +150,9 @@ argv = yargs(hideBin(process.argv))
 const projectPath = argv._[0];
 
 if (fs.existsSync(path.join(projectPath, '../../zou'))) {
-  bundleDir = path.resolve(projectPath, '../..') + '/';
+  bundleDir = path.resolve(projectPath, '../..') + path.sep;
 } else if (fs.existsSync(path.join(projectPath, '../../../zou'))) {
-  bundleDir = path.resolve(projectPath, '../../..') + '/';
+  bundleDir = path.resolve(projectPath, '../../..') + path.sep;
 } else {
   bundleDir = path.dirname(projectPath);
 }
