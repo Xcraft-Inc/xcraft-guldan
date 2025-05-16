@@ -1,13 +1,6 @@
 # 📘 Documentation du module xcraft-guldan
 
-# Gul'dan
-
-> Gul'dan is a powerful orcish warlock in the Warcraft universe
-> who made a pact with the demonic Burning Legion, corrupting the
-> orcish Horde and playing a pivotal role in their invasion of
-> Azeroth. His pursuit of power led to the transformation of Draenor
-> into Outland, and he remains a recurring villain associated
-> with fel magic and manipulation in the Warcraft lore.
+> Gul'dan is a powerful orcish warlock in the Warcraft universe who made a pact with the demonic Burning Legion, corrupting the orcish Horde and playing a pivotal role in their invasion of Azeroth. His pursuit of power led to the transformation of Draenor into Outland, and he remains a recurring villain associated with fel magic and manipulation in the Warcraft lore.
 
 ## Aperçu
 
@@ -70,10 +63,13 @@ Ce fichier est le point d'entrée de l'application CLI. Il contient la logique p
 
 Les fonctions principales sont:
 
-- `resolveDependencies`: Analyse récursivement un fichier de projet pour trouver toutes ses dépendances
-- `resolveImported`: Traite les fichiers importés et ajoute leurs dépendances
-- `normalizePath`: Normalise les chemins de fichiers en remplaçant les variables et en ajustant les séparateurs
-- `resolveImportedFilePath`: Résout le chemin complet d'un fichier importé
+- **`resolveDependencies(projectFile)`** - Analyse récursivement un fichier de projet pour trouver toutes ses dépendances. Vérifie l'existence du fichier, extrait les propriétés et parcourt les différents types de références.
+
+- **`resolveImported(importedFile, projectFile)`** - Traite les fichiers importés et ajoute leurs dépendances au registre global des dépendances.
+
+- **`normalizePath(filePath, currentFile)`** - Normalise les chemins de fichiers en remplaçant les variables par leurs valeurs, en ajustant les séparateurs de chemin et en résolvant les chemins spéciaux comme `$(BundleDir)` et `$(ZouDir)`.
+
+- **`resolveImportedFilePath(importedFile, currentFile)`** - Résout le chemin complet d'un fichier importé en tenant compte du répertoire courant et en normalisant le chemin.
 
 L'outil prend en charge plusieurs types de références:
 
