@@ -6,6 +6,17 @@
 
 xcraft-guldan est un utilitaire en ligne de commande pour l'écosystème Xcraft, conçu pour analyser les dépendances entre projets Visual Studio (.vcxproj, .sln, etc.). Il permet de visualiser l'arborescence des projets et leurs interdépendances, ce qui est particulièrement utile pour comprendre la structure de grands projets.
 
+## Sommaire
+
+- [Structure du module](#structure-du-module)
+- [Fonctionnement global](#fonctionnement-global)
+- [Exemples d'utilisation](#exemples-dutilisation)
+- [Interactions avec d'autres modules](#interactions-avec-dautres-modules)
+- [Détails des sources](#détails-des-sources)
+  - [bin/guldan](#binguldan)
+  - [.eslintrc.js](#eslintrcjs)
+  - [package.json](#packagejson)
+
 ## Structure du module
 
 Le module est structuré comme un outil en ligne de commande (CLI) avec les caractéristiques suivantes:
