@@ -1,10 +1,10 @@
-# 📘 Documentation du module xcraft-guldan
+# 📘 xcraft-guldan
 
 > Gul'dan is a powerful orcish warlock in the Warcraft universe who made a pact with the demonic Burning Legion, corrupting the orcish Horde and playing a pivotal role in their invasion of Azeroth. His pursuit of power led to the transformation of Draenor into Outland, and he remains a recurring villain associated with fel magic and manipulation in the Warcraft lore.
 
 ## Aperçu
 
-xcraft-guldan est un utilitaire en ligne de commande pour l'écosystème Xcraft, conçu pour analyser les dépendances entre projets Visual Studio (.vcxproj, .sln, etc.). Il permet de visualiser l'arborescence des projets et leurs interdépendances, ce qui est particulièrement utile pour comprendre la structure de grands projets.
+`xcraft-guldan` est un utilitaire en ligne de commande (CLI) pour l'écosystème Xcraft, conçu pour analyser récursivement les dépendances entre projets Visual Studio (`.vcxproj`, `.sln`, `.props`, `.targets`, `.msbuildproj`, etc.). Il permet de cartographier l'arborescence des projets et leurs interdépendances, ce qui est particulièrement utile pour comprendre et auditer la structure de grands projets C++/C# multi-modules.
 
 ## Sommaire
 
@@ -13,102 +13,114 @@ xcraft-guldan est un utilitaire en ligne de commande pour l'écosystème Xcraft,
 - [Exemples d'utilisation](#exemples-dutilisation)
 - [Interactions avec d'autres modules](#interactions-avec-dautres-modules)
 - [Détails des sources](#détails-des-sources)
-  - [bin/guldan](#binguldan)
-  - [.eslintrc.js](#eslintrcjs)
-  - [package.json](#packagejson)
+  - [`bin/guldan`](#binguldan)
+  - [`.eslintrc.js`](#eslintrcjs)
+- [Licence](#licence)
 
 ## Structure du module
 
-Le module est structuré comme un outil en ligne de commande (CLI) avec les caractéristiques suivantes:
+Le module est structuré comme un outil CLI minimal avec les composants suivants :
 
-- Point d'entrée via le binaire `bin/guldan`
-- Utilisation de `cheerio` pour l'analyse XML des fichiers de projet
-- Utilisation de `vs-parse` pour l'analyse de fichiers de solution Visual Studio (.sln)
-- Interface de ligne de commande construite avec `yargs`
+- **`bin/guldan`** — Point d'entrée exécutable contenant l'intégralité de la logique d'analyse
+- **`.eslintrc.js`** — Configuration ESLint pour le développement du module
+- **`package.json`** — Manifeste du module avec les dépendances
+
+Dépendances principales :
+
+- [`cheerio`](https://cheerio.js.org/) — Analyse et parcours de contenu XML des fichiers de projet MSBuild
+- [`vs-parse`](https://www.npmjs.com/package/vs-parse) — Analyse des fichiers de solution Visual Studio (`.sln`)
+- [`yargs`](https://yargs.js.org/) — Construction de l'interface en ligne de commande
 
 ## Fonctionnement global
 
-xcraft-guldan analyse récursivement les fichiers de projet Visual Studio pour identifier toutes les dépendances. Il parcourt les références de projet, les importations et autres liens entre fichiers pour construire une carte complète des dépendances.
+`xcraft-guldan` réalise une analyse statique récursive de fichiers de projet MSBuild. À partir d'un fichier d'entrée, il parcourt toutes les références et importations pour construire un graphe complet des dépendances.
 
-Le processus fonctionne comme suit:
+### Étapes de traitement
 
-1. Analyse du fichier de projet initial (fourni en argument)
-2. Identification du répertoire racine du bundle
-3. Extraction des propriétés du projet pour résoudre les variables
-4. Analyse récursive de toutes les références et importations
-5. Affichage des résultats selon les options spécifiées
+1. **Détermination du `bundleDir`** — L'outil identifie le répertoire racine du bundle en remontant l'arborescence à la recherche d'un répertoire `zou`.
+2. **Analyse du fichier racine** — Le fichier de projet fourni en argument est lu et parsé.
+3. **Extraction des propriétés MSBuild** — Les balises `<PropertyGroup>` sont extraites pour permettre la résolution des variables (`$(BundleDir)`, `$(ZouDir)`, `$(V)`, etc.).
+4. **Résolution récursive des dépendances** — Les quatre types de références suivants sont explorés :
+   - `<ProjectReference Include="...">` dans les `<ItemGroup>` (fichiers `.vcxproj`)
+   - `<Import Project="...">` dans les `<ImportGroup>` (fichiers `.props`, `.targets`)
+   - `<Import Project="...">` directement sous `<Project>`
+   - `<ImportProject Include="...">` dans les `<ItemGroup>` (fichiers `.msbuildproj`, `.sln`)
+5. **Normalisation des chemins** — Les variables MSBuild sont substituées et les séparateurs de chemin sont adaptés à la plateforme courante.
+6. **Affichage des résultats** — Les dépendances résolues sont affichées selon les options passées en argument.
+
+### Résolution des variables de chemin
+
+| Variable MSBuild | Résolution                                      |
+| ---------------- | ----------------------------------------------- |
+| `$(BundleDir)`   | Répertoire racine du bundle (auto-détecté)      |
+| `$(ZouDir)`      | `<bundleDir>/zou/`                              |
+| `$(V)`           | Séparateur de chemin OS (`/` ou `\`)            |
+| Autres `$(VAR)`  | Valeur extraite des `<PropertyGroup>` du projet |
 
 ## Exemples d'utilisation
 
 ```bash
-# Afficher toutes les dépendances d'un projet
+# Afficher toutes les dépendances d'un projet (chemins relatifs au bundle)
 guldan path/to/myProject.vcxproj
 
-# Afficher les dépendances manquantes
+# Afficher les projets dont les fichiers sont introuvables
 guldan -m path/to/myProject.vcxproj
 
-# Afficher les chemins complets des projets
+# Afficher les chemins complets absolus
 guldan -p path/to/myProject.vcxproj
 
-# Afficher uniquement les noms de répertoires
+# Afficher uniquement les noms de répertoires de premier niveau
 guldan -d path/to/myProject.vcxproj
+
+# Combiner les options
+guldan -m -d path/to/myProject.sln
 
 # Afficher l'aide
 guldan -h
 ```
 
+### Options disponibles
+
+| Option           | Alias | Description                                                                        |
+| ---------------- | ----- | ---------------------------------------------------------------------------------- |
+| `--show-missing` | `-m`  | Affiche sur stderr les fichiers de projet référencés mais introuvables             |
+| `--show-full`    | `-p`  | Affiche les chemins complets absolus plutôt que les chemins relatifs au bundle     |
+| `--dirname-only` | `-d`  | Affiche uniquement le nom du répertoire de premier niveau (sans le chemin complet) |
+| `--help`         | `-h`  | Affiche l'aide                                                                     |
+
 ## Interactions avec d'autres modules
 
-Ce module est principalement un outil autonome qui n'interagit pas directement avec d'autres modules Xcraft pendant son exécution. Il est conçu pour analyser la structure des projets qui peuvent inclure des modules Xcraft.
+Ce module est un outil autonome qui n'interagit pas avec d'autres modules Xcraft à l'exécution. Il est conçu pour analyser la structure de projets pouvant contenir des modules Xcraft ou tout autre projet MSBuild, indépendamment du bus Xcraft.
 
 ## Détails des sources
 
 ### `bin/guldan`
 
-Ce fichier est le point d'entrée de l'application CLI. Il contient la logique principale pour:
+Point d'entrée de l'application CLI. Ce fichier unique contient l'intégralité de la logique d'analyse et d'affichage.
 
-- Analyser les fichiers de projet Visual Studio (.vcxproj, .sln, etc.)
-- Résoudre les chemins relatifs et les variables
-- Extraire les références entre projets
-- Afficher les résultats selon différentes options
+#### Méthodes publiques
 
-Les fonctions principales sont:
+- **`resolveDependencies(projectFile)`** — Fonction principale d'analyse récursive. Lit le fichier de projet, extrait les propriétés MSBuild, puis parcourt les quatre types de références supportés. Si le fichier est absent ou est un répertoire, il est enregistré dans `missing` (si l'option `-m` est active). Évite les cycles grâce à un registre `dependencies` qui court-circuite les fichiers déjà traités.
 
-- **`resolveDependencies(projectFile)`** - Analyse récursivement un fichier de projet pour trouver toutes ses dépendances. Vérifie l'existence du fichier, extrait les propriétés et parcourt les différents types de références.
+- **`resolveImported(importedFile, projectFile)`** — Résout le chemin d'un fichier importé relativement au fichier courant, puis déclenche `resolveDependencies` sur ce fichier. Fusionne les dépendances découvertes dans le registre global.
 
-- **`resolveImported(importedFile, projectFile)`** - Traite les fichiers importés et ajoute leurs dépendances au registre global des dépendances.
+- **`normalizePath(filePath, currentFile)`** — Normalise un chemin MSBuild en substituant les variables (`$(BundleDir)`, `$(ZouDir)`, `$(V)` et toute variable présente dans les `<PropertyGroup>`), et en adaptant les séparateurs de chemin à la plateforme.
 
-- **`normalizePath(filePath, currentFile)`** - Normalise les chemins de fichiers en remplaçant les variables par leurs valeurs, en ajustant les séparateurs de chemin et en résolvant les chemins spéciaux comme `$(BundleDir)` et `$(ZouDir)`.
-
-- **`resolveImportedFilePath(importedFile, currentFile)`** - Résout le chemin complet d'un fichier importé en tenant compte du répertoire courant et en normalisant le chemin.
-
-L'outil prend en charge plusieurs types de références:
-
-- Références de projet dans les fichiers .vcxproj
-- Importations dans les groupes d'importation
-- Importations directes au niveau du projet
-- Projets importés dans les groupes d'éléments
+- **`resolveImportedFilePath(importedFile, currentFile)`** — Combine `path.dirname(currentFile)` et le résultat de `normalizePath` pour obtenir le chemin absolu d'un fichier importé via `path.resolve`.
 
 ### `.eslintrc.js`
 
-Ce fichier configure ESLint pour le projet avec les caractéristiques suivantes:
+Configuration ESLint pour le développement du module. Points notables :
 
-- Support pour ES2022
-- Support pour JSX et React
-- Règles de documentation JSDoc
-- Configuration spécifique pour ignorer certaines variables non utilisées dans la destructuration
+- Support ES2022, JSX/React et environnements `browser`, `node` et `mocha`
+- Plugins `react`, `babel` et `jsdoc` activés
+- La règle `no-unused-vars` tolère les variables ignorées dans la destructuration d'arrays (`^_`) et ignore les arguments de fonctions
+- `react/display-name` désactivé
 
-### `package.json`
+## Licence
 
-Le fichier package.json définit:
+Ce module est distribué sous [licence MIT](./LICENSE).
 
-- Le nom du module: `xcraft-guldan`
-- Version: `1.0.1`
-- Point d'entrée binaire: `bin/guldan`
-- Dépendances principales:
-  - `cheerio`: Pour l'analyse de contenu XML
-  - `vs-parse`: Pour l'analyse de fichiers Visual Studio
-  - `yargs`: Pour la création d'interfaces en ligne de commande
-- Dépendances de développement liées à l'écosystème Xcraft et à la mise en forme du code
+---
 
-_Cette documentation a été mise à jour automatiquement._
+_Ce contenu a été généré par IA_
